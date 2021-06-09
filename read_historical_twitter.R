@@ -2,22 +2,26 @@
 # @author: Dr Adam Varley, University of Stirling, Created using funding provided by NERC under the ASSIST project subsidery of the Unconventional Hydrocarbons project 
 # Created on 29-03-2021
 # Unlicensed but would be grateful for a citation if used and it is important that tyou apropriately cite Twitter for their wonderful contribution to science in V2!!
+# Also the code is heavily reliant on the below dependencies
 
-require(httr)
+# I have chosen to use Mongo as the json results that come out of the API are unstructured and flattening proved challenging. It is not ideal, but is preferable to saving all data into an
+#unmanageble JSON file. Feel free to flatten results, although owed to the nature and complexity of the output this might be challenging and needs some real thought. 
+
+library(httr)
 library(jsonify)
 library('mongolite')
 library(jsonlite)
 library(tidyverse)
 library(lubridate)
 
-# The connection to the mongo DB, please carve the code up if you want list response out. Or even better work out how to flatten the JSON response into nice dataframe.
+# The connection to the mongo DB, please carve the code up if you want list response out. Or even better work out how to flatten the JSON response into nice dataframe like TweetR.
 conn =  "your-mongo-connection"
 
 bearer_token <- "your-token"
 
 headers <- c(`Authorization` = sprintf('Bearer %s', bearer_token))
 
-# Function for pulling correct datatime from Twitter response
+# Function for pulling correct datetime from Twitter response
 send_Mongo <- function(data,con){
   for(i in 1:length(data)){
     if(!is.null(data[[i]]$created_at)){
@@ -44,9 +48,9 @@ send_token_retrieve_data <- function(query_term_combined,tweets_per_request,star
     place.fields = 'contained_within,country,country_code,full_name,geo,id,name,place_type',
     media.fields = 'duration_ms,height,media_key,preview_image_url,type,url,width,public_metrics'
   )
+  # Next token will allow for pagination, kill if no token returned
   if(next_token != 0){params = c(params,next_token = next_token)}
   message('querying Twitter')
-  # params = c(params,next_token = 'b26v89c19zqg8o3foskrgntipeo4ap6v39t7gsf5ztlkt')
   
   # Search the correct endpoint - must have authentification for this - please see Twitter developer guide 
   response <- httr::GET(url = 'https://api.twitter.com/2/tweets/search/all', httr::add_headers(.headers=headers), query = params)
@@ -92,12 +96,13 @@ send_token_retrieve_data <- function(query_term_combined,tweets_per_request,star
 }
 
 # Wrapper round main function to call per day
-# I tried to pull much larger queries returning 100,000 of records over over years and found the tokens droppped out. Therefore, stuck to days and looped
+# I tried to pull much larger queries returning 100,000 of records over years and found the tokens droppped out. Therefore, stuck to days and looped
 keyword_spatial_search <- function(db_name,start_date,end_date,spatial_query,keyword_query,bbox,tweets_per_request){
   dropouts <- character()
   start_date <- as.POSIXct(start_date,format="%Y-%m-%dT%H:%M:%OS")
   end_date <- as.POSIXct(end_date,format="%Y-%m-%dT%H:%M:%OS")
   date_sequence <- seq(start_date,end_date,by = 'day')
+  # Will build in bounding box later
   # bbox_cat = paste('bounding_box:[',paste(bbox,collapse = ' '),']',sep = "")
   query_term_combined = paste(keyword_query,spatial_query)
   time_frame <- data.frame(from = as.character(date_sequence[-length(date_sequence[-1])],format="%Y-%m-%dT%H:%M:%OSZ"),to = as.character(date_sequence[-1],format="%Y-%m-%dT%H:%M:%OSZ"))
@@ -125,8 +130,9 @@ keyword_spatial_search <- function(db_name,start_date,end_date,spatial_query,key
   return(dropouts)
 }
 
-# Similar to SQL boolean logic but nothing for AND below search for altcar only when fracking or shale are present
+# Similar to SQL boolean logic but nothing for AND
 # Has geo returns point data
+# You need to look carefully at the documentation for exact query structure. It is NOT straightforward 
 # key term search
 keyword_query = '(football OR "Manchester United" OR "Paul Pogba") lang:en'
 # spatial seach add here
