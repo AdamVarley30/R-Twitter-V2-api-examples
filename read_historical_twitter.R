@@ -134,6 +134,8 @@ keyword_spatial_search <- function(db_name,start_date,end_date,spatial_query,key
 # Similar to SQL boolean logic but nothing for AND
 # Has geo returns point data
 # You need to look carefully at the documentation for exact query structure. It is NOT straightforward 
+# https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query
+
 # key term search
 keyword_query = '(football OR "Manchester United" OR "Paul Pogba") lang:en'
 # spatial seach add here
