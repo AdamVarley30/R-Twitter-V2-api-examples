@@ -144,4 +144,3 @@ spatial_query = 'place_country:GB OR place_country:US'
 # call main function and give a new Mongo output DB. 
 data_returned <- keyword_spatial_search(db_name = 'football',start_date = '2006-04-01T00:00:00Z',end_date = '2018-05-09T00:00:00Z', spatial_query = spatial_query , keyword_query = keyword_query,tweets_per_request = 100)
 
-
