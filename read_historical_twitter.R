@@ -1,11 +1,9 @@
 
 # @author: Dr Adam Varley, University of Stirling, Created using funding provided by NERC under the ASSIST project subsidery of the Unconventional Hydrocarbons project 
 # Created on 29-03-2021
-# Unlicensed but would be grateful for a citation if used and it is important that tyou apropriately cite Twitter for their wonderful contribution to science in V2!!
+# Unlicensed but would be grateful for a citation if used and it is important that you apropriately cite Twitter for their wonderful contribution to science in V2!!
 # Also the code is heavily reliant on the below dependencies
 
-# I have chosen to use Mongo as the json results that come out of the API are unstructured and flattening proved challenging. It is not ideal, but is preferable to saving all data into an
-#unmanageble JSON file. Feel free to flatten results, although owed to the nature and complexity of the output this might be challenging and needs some real thought. 
 
 library(httr)
 library(jsonify)
@@ -14,7 +12,10 @@ library(jsonlite)
 library(tidyverse)
 library(lubridate)
 
-# The connection to the mongo DB, please carve the code up if you want list response out. Or even better work out how to flatten the JSON response into nice dataframe like TweetR.
+# I have chosen to use Mongo as the json results that come out of the API are unstructured and flattening proved challenging. It is not ideal, but is preferable to saving all data into an
+#unmanageble JSON file. Feel free to flatten results, although owed to the nature and complexity of the output this might be challenging and needs some real thought. 
+
+# The connection to the mongo DB
 conn =  "your-mongo-connection"
 
 bearer_token <- "your-token"
