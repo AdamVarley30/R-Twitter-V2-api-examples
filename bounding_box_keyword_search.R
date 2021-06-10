@@ -12,7 +12,7 @@ library(tidyverse)
 library(RPostgreSQL)
 library(lubridate)
 library(geojsonsf)
-library('mongolite')
+library(mongolite)
 library(jsonlite)
 
 
@@ -23,7 +23,6 @@ library(jsonlite)
 conn =  "your-mongo connection"
 
 bearer_token <- "your-token"
-
 headers <- c(`Authorization` = sprintf('Bearer %s', bearer_token))
 
 i=2
@@ -123,9 +122,9 @@ send_token_retrieve_data <- function(query_term_combined,tweets_per_request,star
   })
   
   if(!is.null(list_tweets$data)){
-    Sys.sleep(((tweet_tot/300)*2)+1)
+    Sys.sleep(3)
   } else {
-    Sys.sleep(0.5)
+    Sys.sleep(2)
   }
   
   return_frame <- list(next_token = next_token, tweets_total = tweet_tot)
@@ -170,6 +169,7 @@ keyword_spatial_search <- function(db_name,start_date,end_date,spatial_query,key
           
           dropouts <- c(as.character(time_frame$from[i]),dropouts)
         })
+      
       tweets_per_run <- tweets_per_run + tweets_tot
       
     }
@@ -204,12 +204,13 @@ search_grid <- st_bbox_by_feature(search_grid) %>% st_as_sf()
 # Plot coordinates to check
 plot(search_grid,col = 'grey')
 
-keyword_query = '(football manchester) lang:en'
+keyword_query = '(tremor OR quake OR shaking OR shook OR wobble OR seism OR quiver OR tremble OR shudder OR sway OR rock OR shudder OR "earth move" OR tectonic) lang:en'
 
 plot_progress <- search_grid
 plot_progress$counts <- NA
 
 for(i in 1:nrow(search_grid)){
+  message('##################################\n   Reading data for block - ', i,'\n##################################\n' )
   ext <- extent(search_grid[i,'x'])
   
   # format bounding box 
@@ -217,6 +218,7 @@ for(i in 1:nrow(search_grid)){
   
   # call main function and give a new Mongo output DB. 
   data_returned <- keyword_spatial_search(db_name = 'earthquakes',start_date = '2006-04-01T00:00:00Z',end_date = '2021-05-09T00:00:00Z', spatial_query = spatial_query , keyword_query = keyword_query,tweets_per_request = 100)
-  plot_progress$counts[i] <- data_returned$count
+  block_count <- ifelse(is.null(data_returned$count),0,data_returned$count)
+  plot_progress$counts[i] <- block_count
   plot(plot_progress['counts'])
 }
