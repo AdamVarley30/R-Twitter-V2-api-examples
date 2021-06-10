@@ -80,7 +80,10 @@ send_token_retrieve_data <- function(query_term_combined,tweets_per_request,star
   response <- httr::GET(url = 'https://api.twitter.com/2/tweets/search/all', httr::add_headers(.headers=headers), query = params)
   
   obj <- httr::content(response, as = "text")
-  list_tweets <- jsonify::from_json(obj)
+  tryCatch({
+    list_tweets <- jsonify::from_json(obj)
+
+  
   
   # Pull next token
   next_token <- list_tweets$meta$next_token
@@ -127,6 +130,13 @@ send_token_retrieve_data <- function(query_term_combined,tweets_per_request,star
   
   return_frame <- list(next_token = next_token, tweets_total = tweet_tot)
   return(return_frame)
+  },error = function(err) { 
+    message(obj)
+    if(grepl('limit',obj)){
+      message('Script sleeping for 30 seconds as request limit has been reached')
+      Sys.sleep(30)
+    }
+  } )
 }
 
 # Wrapper round main function to call per day
@@ -194,7 +204,7 @@ search_grid <- st_bbox_by_feature(search_grid) %>% st_as_sf()
 # Plot coordinates to check
 plot(search_grid,col = 'grey')
 
-keyword_query = '(tremor OR quake OR shaking OR shook OR wobble OR seism OR quiver OR tremble OR shudder OR sway OR rock OR shudder OR "earth move" OR tectonic) lang:en'
+keyword_query = '(football manchester) lang:en'
 
 plot_progress <- search_grid
 plot_progress$counts <- NA
@@ -208,6 +218,5 @@ for(i in 1:nrow(search_grid)){
   # call main function and give a new Mongo output DB. 
   data_returned <- keyword_spatial_search(db_name = 'earthquakes',start_date = '2006-04-01T00:00:00Z',end_date = '2021-05-09T00:00:00Z', spatial_query = spatial_query , keyword_query = keyword_query,tweets_per_request = 100)
   plot_progress$counts[i] <- data_returned$count
-  # Plot map with updates of tweets collected
   plot(plot_progress['counts'])
 }
