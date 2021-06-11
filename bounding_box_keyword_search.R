@@ -31,27 +31,21 @@ send_Mongo <- function(data,con){
   if(!is.null(data)){
     # for list
     for(i in 1:length(data)){
+      # Try and force ISO timestamp to Posixct
       tryCatch(expr = {if(!is.null(data[[i]]$created_at)){
         data[[i]]$created_at <- as.POSIXct(data[[i]]$created_at,format="%Y-%m-%dT%H:%M:%OS")
-        data[[i]]$ingestion_date <- Sys.time()
-        item <- data[[i]]
-        con$insert(item)
-      }}, error = function (err) {}
-      )
-      # for df  
-      tryCatch(expr = {if(!is.null(data[i,]$created_at)){
-        row = data[i,]
-        row$created_at <- as.POSIXct(row$created_at,format="%Y-%m-%dT%H:%M:%OS")
-        
-        row$ingestion_date <- Sys.time()
-        con$insert(row)
-      }}, error = function (err) {}
+      }}, error = function (err) {
+      }
       )
       
-      returned <- 1
+      #Add ingestion date
+      data[[i]]$ingestion_date <- Sys.time()
+      item <- data[[i]]
+      con$insert(item)
+      returned <- 'Submitted'
     }
   } else {
-    returned <- 0
+    returned <- 'No data to submit'
   }
   return(returned)
 }
@@ -80,7 +74,7 @@ send_token_retrieve_data <- function(query_term_combined,tweets_per_request,star
   
   obj <- httr::content(response, as = "text")
   tryCatch({
-    list_tweets <- jsonify::from_json(obj)
+    list_tweets <- jsonify::from_json(obj,simplify = FALSE)
 
   
   
@@ -107,10 +101,9 @@ send_token_retrieve_data <- function(query_term_combined,tweets_per_request,star
   })
   
   tryCatch(expr = {
-    if(!is.null(list_tweets$includes$places)){
-      data_list <- split(list_tweets$includes$places, seq(nrow(list_tweets$includes$places)))
-      send_Mongo(data = data_list,con = DBplaces)}
-  },error = function(err) {
+      send_Mongo(data = list_tweets$includes$places,con = DBplaces)
+      }}
+  ,error = function(err) {
     message(err)
   }
   )
@@ -135,7 +128,7 @@ send_token_retrieve_data <- function(query_term_combined,tweets_per_request,star
       message('Script sleeping for 30 seconds as request limit has been reached')
       Sys.sleep(30)
     }
-  } )
+  })
 }
 
 # Wrapper round main function to call per day
@@ -148,7 +141,7 @@ keyword_spatial_search <- function(db_name,start_date,end_date,spatial_query,key
   
   query_term_combined = paste(keyword_query,spatial_query)
   time_frame <- data.frame(from = as.character(date_sequence[-length(date_sequence[-1])],format="%Y-%m-%dT%H:%M:%OSZ"),to = as.character(date_sequence[-1],format="%Y-%m-%dT%H:%M:%OSZ"))
-  i = 1
+  i = 7
   tweets_per_run <- 0
   for(i in nrow(time_frame):1){
     message('collecting tweets for : ', time_frame$from[i])
@@ -208,7 +201,7 @@ keyword_query = '(tremor OR quake OR shaking OR shook OR wobble OR seism OR quiv
 
 plot_progress <- search_grid
 plot_progress$counts <- NA
-
+i=30
 for(i in 1:nrow(search_grid)){
   message('##################################\n   Reading data for block - ', i,'\n##################################\n' )
   ext <- extent(search_grid[i,'x'])
@@ -222,3 +215,6 @@ for(i in 1:nrow(search_grid)){
   plot_progress$counts[i] <- block_count
   plot(plot_progress['counts'])
 }
+
+
+
