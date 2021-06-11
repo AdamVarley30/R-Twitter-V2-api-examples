@@ -25,7 +25,6 @@ conn =  "your-mongo connection"
 bearer_token <- "your-token"
 headers <- c(`Authorization` = sprintf('Bearer %s', bearer_token))
 
-i=2
 # Function for pulling correct datetime from Twitter response
 send_Mongo <- function(data,con){
   if(!is.null(data)){
@@ -74,64 +73,64 @@ send_token_retrieve_data <- function(query_term_combined,tweets_per_request,star
   
   obj <- httr::content(response, as = "text")
   tryCatch({
+    # Return ordered lists instead of dataframe forcing (can get confusing when submitting to MongDB)
     list_tweets <- jsonify::from_json(obj,simplify = FALSE)
-
-  
-  
-  # Pull next token
-  next_token <- list_tweets$meta$next_token
-  tweet_tot <- ifelse(is.null(list_tweets$meta$result_count),0, list_tweets$meta$result_count)
-  
-  # insert into MongoDB tables the 4 separate tree responses from Twitter
-  DBtweets  <- mongo(collection = 'tweets',db = db_name,url = conn)
-  DBusers  <- mongo(collection = 'users',db = db_name,url = conn)
-  DBplaces <- mongo(collection = 'places',db = db_name,url = conn)
-  DBtweetsInfo <- mongo(collection = 'tweets_info',db = db_name,url = conn)
-  
-  tryCatch(expr = {
-    send_Mongo(data = list_tweets$data,con = DBtweets)
-  },error = function(err) {
-    message(err)
-  })
-  
-  tryCatch(expr = {
-    send_Mongo(data = list_tweets$includes$users,con = DBusers)
-  },error = function(err) {
-    message(err)
-  })
-  
-  tryCatch(expr = {
+    
+    
+    # Pull next token and total tweet count
+    next_token <- list_tweets$meta$next_token
+    tweet_tot <- ifelse(is.null(list_tweets$meta$result_count),0, list_tweets$meta$result_count)
+    
+    # insert into MongoDB tables the 4 separate tree responses from Twitter
+    DBtweets  <- mongo(collection = 'tweets',db = db_name,url = conn)
+    DBusers  <- mongo(collection = 'users',db = db_name,url = conn)
+    DBplaces <- mongo(collection = 'places',db = db_name,url = conn)
+    DBtweetsInfo <- mongo(collection = 'tweets_info',db = db_name,url = conn)
+    
+    tryCatch(expr = {
+      send_Mongo(data = list_tweets$data,con = DBtweets)
+    },error = function(err) {
+      message(err)
+    })
+    
+    tryCatch(expr = {
+      send_Mongo(data = list_tweets$includes$users,con = DBusers)
+    },error = function(err) {
+      message(err)
+    })
+    
+    tryCatch(expr = {
       send_Mongo(data = list_tweets$includes$places,con = DBplaces)
-      }}
-  ,error = function(err) {
-    message(err)
-  }
-  )
-  
-  tryCatch(expr = {
-    send_Mongo(list_tweets$includes$tweets,con = DBtweetsInfo)
-  },error = function(err) {
-    message(err)
-  })
-  
-  if(!is.null(list_tweets$data)){
-    Sys.sleep(3)
-  } else {
-    Sys.sleep(2)
-  }
-  
-  return_frame <- list(next_token = next_token, tweets_total = tweet_tot)
-  return(return_frame)
+    }
+    ,error = function(err) {
+      message(err)}
+    )
+    
+    tryCatch(expr = {
+      send_Mongo(list_tweets$includes$tweets,con = DBtweetsInfo)
+    },error = function(err) {
+      message(err)
+    })
+    
+    if(!is.null(list_tweets$data)){
+      Sys.sleep(3)
+    } else {
+      Sys.sleep(2)
+    }
+    
+    return_frame <- list(next_token = next_token, tweets_total = tweet_tot)
+    return(return_frame)
   },error = function(err) { 
     message(obj)
     if(grepl('limit',obj)){
+      # force sleep if system overloaded
       message('Script sleeping for 30 seconds as request limit has been reached')
       Sys.sleep(30)
     }
   })
 }
 
-# Wrapper round main function to call per day
+# Wrapper round main function to call per specified time period
 # I tried to pull much larger queries returning 100,000 of records over years and found the tokens droppped out. Therefore, stuck to days and looped
 keyword_spatial_search <- function(db_name,start_date,end_date,spatial_query,keyword_query,bbox,tweets_per_request){
   dropouts <- character()
@@ -140,8 +139,9 @@ keyword_spatial_search <- function(db_name,start_date,end_date,spatial_query,key
   date_sequence <- seq(start_date,end_date,by = 'year')
   
   query_term_combined = paste(keyword_query,spatial_query)
+  # Create timeframe dataframe to loop through
   time_frame <- data.frame(from = as.character(date_sequence[-length(date_sequence[-1])],format="%Y-%m-%dT%H:%M:%OSZ"),to = as.character(date_sequence[-1],format="%Y-%m-%dT%H:%M:%OSZ"))
-  i = 7
+
   tweets_per_run <- 0
   for(i in nrow(time_frame):1){
     message('collecting tweets for : ', time_frame$from[i])
@@ -149,19 +149,21 @@ keyword_spatial_search <- function(db_name,start_date,end_date,spatial_query,key
     next_token <- 0
     while(!is.null(next_token)){
       tryCatch(expr = {
+        # Call main function
         list_data <- send_token_retrieve_data(query_term_combined,
                                               tweets_per_request,start_date_request = time_frame$from[i],end_date_request = time_frame$to[i], 
                                               next_token,headers)
+        # Collect stats to inform user
         next_token <- list_data$next_token
         tweets_tot <- tweets_tot + list_data$tweets_tot
         
-        }
-        ,error = function(err) {
-          message(time_frame$from[i] ,' dropped out \n')
-          message(err)
-          
-          dropouts <- c(as.character(time_frame$from[i]),dropouts)
-        })
+      }
+      ,error = function(err) {
+        message(time_frame$from[i] ,' dropped out \n')
+        message(err)
+        
+        dropouts <- c(as.character(time_frame$from[i]),dropouts)
+      })
       
       tweets_per_run <- tweets_per_run + tweets_tot
       
@@ -197,8 +199,10 @@ search_grid <- st_bbox_by_feature(search_grid) %>% st_as_sf()
 # Plot coordinates to check
 plot(search_grid,col = 'grey')
 
-keyword_query = '(tremor OR quake OR shaking OR shook OR wobble OR seism OR quiver OR tremble OR shudder OR sway OR rock OR shudder OR "earth move" OR tectonic) lang:en'
+# Key words to be used in search
+keyword_query = '(football "Manchester United") lang:en'
 
+# Create progress grid that can be plotted
 plot_progress <- search_grid
 plot_progress$counts <- NA
 i=30
@@ -215,6 +219,3 @@ for(i in 1:nrow(search_grid)){
   plot_progress$counts[i] <- block_count
   plot(plot_progress['counts'])
 }
-
-
-
